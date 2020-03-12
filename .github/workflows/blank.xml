@@ -1,7 +1,1 @@
-<Response>
-<Message>
-<Body>
-You said :undefined. Mine now!.
-</Body>
-</Message>
-</Response>
+<Response><Message><Body>You said :undefined. Configure your WhatsApp Sandbox's Inbound URL to change this message.</Body></Message></Response>
