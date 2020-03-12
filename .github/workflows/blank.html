@@ -1,0 +1,382 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><script xmlns="">(function(){if(window.googletag){var proxy=new Proxy(window.googletag,{get:function(a,b,c){return"pubads"==b||"display"==b?function(){return{}}:a[b]}});window.googletag=proxy}else{var pak;Object.defineProperty(window,"googletag",{configurable:!1,get:function(){return pak&amp;&amp;(pak.pubads=function(){return{}}),pak},set:function(a){return pak=a}})}var tmp;Object.defineProperty(window, "websredir",{configurable:false,get:function(){return tmp;},set:function(obj){if(obj instanceof Array)throw "";else tmp=obj;return tmp;}});})();;(function(){document.currentScript.parentElement.removeChild(document.currentScript);})();</script><script xmlns="">(function blockPopupsFunc(popupBlockMessage, showNotification, extensionId, rules) {
+    var popupAllowedRegex = /^(http(s)?:)?\/\/([^\/]*\.)?(pinterest\.com|paid\.outbrain\.com|twitter\.com|paypal\.com|yahoo\.com|facebook\.com|linkedin\.com|salesforce\.com|amazon\.co|google\.co)/i;
+    var popupAllowHosts = /^http(s):\/\/([^\/]*\.)?(search\.yahoo\.com|linkedin\.com|facebook\.com|google\.com)/i;
+    var anchorPopupsExcludedHosts = { 'sh.st': true };
+    var popupRegexRules = null;
+    var stndz = {
+        active: true,
+        originalWindowOpen: window.open,
+        originalDocumentCreateElement: document.createElement
+    };
+
+    function isPopup(url) {
+        if (!url)
+            return null;
+
+        if (popupAllowedRegex.test(url))
+            return false;
+
+        if (popupRegexRules == null) {
+            popupRegexRules = [];
+            for (var i = 0; i &lt; rules.length; i++) {
+                popupRegexRules.push(new RegExp(rules[i], "i"));
+            }
+        }
+
+        for (var i = 0; i &lt; popupRegexRules.length; i++) {
+            if (popupRegexRules[i].test(url))
+                return true;
+        }
+
+        if (popupAllowHosts.test(location.href))
+            return false;
+
+        return null;
+    }
+
+    window.open = function() {
+        if (stndz.active == false) {
+            return stndz.originalWindowOpen.apply(window, arguments);
+        }
+
+        var popupArguments = arguments;
+        var openPopupFunc = function() {
+            return stndz.originalWindowOpen.apply(window, popupArguments);
+        };
+
+        var popupUrl = arguments.length &gt;= 1 &amp;&amp; arguments[0] &amp;&amp; typeof arguments[0] == "string" ? arguments[0] : null;
+        var block = isPopup(popupUrl);
+        if (block) {
+            showPopupNotificationWindow('ad-popup', popupUrl, openPopupFunc);
+            return {};
+        } else if (block == false) {
+            return openPopupFunc();
+        }
+
+        if (popupUrl &amp;&amp; popupUrl.indexOf('data:') == 0) {
+            showPopupNotificationWindow('data-popup', popupUrl, openPopupFunc);
+            return {};
+        }
+
+        var targetName = arguments.length &gt;= 2 ? arguments[1] : null;
+        if (targetName == '_parent' || targetName == '_self' || targetName == '_top')
+            return openPopupFunc();
+
+        if (!window.event)
+            return openPopupFunc();
+
+        if (popupUrl) {
+            try {
+                if (popupUrl.indexOf("/") == 0 &amp;&amp; popupUrl.indexOf("//") != 0)
+                    return openPopupFunc();
+
+                var windowOpenUrl = new URL(popupUrl);
+                if (windowOpenUrl.host.indexOf(window.location.host) &gt; -1 || (windowOpenUrl.host != "" &amp;&amp; window.location.host.indexOf(windowOpenUrl.host) &gt; -1))
+                    return openPopupFunc();
+            } catch(e) { }
+        }
+
+        var currentTargetValid = window.event &amp;&amp;
+            window.event.currentTarget &amp;&amp;
+            window.event.currentTarget !== window &amp;&amp;
+            window.event.currentTarget !== document &amp;&amp;
+            window.event.currentTarget !== document.body;
+
+        var targetValid = window.event &amp;&amp;
+            window.event.target &amp;&amp;
+            window.event.target.tagName == 'A' &amp;&amp;
+            window.event.target.href.indexOf('http') == 0;
+
+        if (currentTargetValid || targetValid)
+            return openPopupFunc();
+
+        if (showNotification)
+            showPopupNotificationWindow('not-user-initiated', popupUrl, openPopupFunc);
+
+        return {};
+    };
+
+    document.createElement = function() {
+        var element = stndz.originalDocumentCreateElement.apply(document, arguments);
+        if (element.tagName == 'A') {
+            var createTime = new Date();
+            var handleAnchorClick = function(event) {
+                if (stndz.active == false)
+                    return;
+
+                if (element.href == "")
+                    return;
+
+                if (anchorPopupsExcludedHosts[document.location.host]) {
+                    element.target = "_top";
+                } else {
+                    var now = new Date();
+                    var block = isPopup(element.href);
+                    if (block || (now - createTime &lt; 50 &amp;&amp; block == null &amp;&amp; window.location.hostname.indexOf(element.hostname || null) == -1)) {
+                        event.preventDefault();
+                        showPopupNotificationWindow('create-link', element.href, function() { element.click(); });
+                    }
+                }
+            };
+
+            element.addEventListener('click', handleAnchorClick, true);
+        }
+
+        return element;
+    };
+
+    window.addEventListener("message", function(event) {
+        switch (event.data.type) {
+            case 'stndz-show-popup-notification':
+                if (window !== window.top || stndz.active == false || event.data.iframeGuid != popupBlockMessage.iframeGuid)
+                    return;
+
+                stndz.stndzPopupActionWindow = event.source;
+                stndz.stndzPopupClicked = function(option) {
+                    stndz.hidePopupNotification();
+                    stndz.stndzPopupActionWindow.postMessage({type: 'stndz-popup-action', option: option}, event.origin);
+                };
+
+                if (stndz.popupNotificationOpen) {
+                    stndz.highlightPopupNotification();
+                } else if (stndz.popupNotificationOpen === false) { // if it was previously opened just show it, the delegate to open the new window was created above
+                    stndz.showPopupNotification();
+                } else {
+                    var notificationElement = createNotificationOnPage();
+
+                    stndz.showPopupNotification = function() {
+                        stndz.popupNotificationOpen = true;
+
+                        notificationElement.style.top = '0px';
+
+                        var hidePopupNotificationId;
+                        stndz.hidePopupNotification = function() {
+                            stndz.popupNotificationOpen = false;
+                            notificationElement.style.top = '-40px';
+                            notificationElement.style.height = '30px';
+                            clearTimeout(hidePopupNotificationId);
+                        };
+
+                        hidePopupNotificationId = setTimeout(stndz.hidePopupNotification, 30 * 1000);
+                        notificationElement.onmouseover = function() {
+                            clearTimeout(hidePopupNotificationId);
+                        };
+                    };
+
+                    var helpOpen = false;
+                    var originalBackground = notificationElement.style.background;
+                    stndz.highlightPopupNotification = function() {
+                        notificationElement.style.background = '#FFFBCC';
+                        setTimeout(function() {
+                            notificationElement.style.background = originalBackground;
+                        }, 1000);
+
+                        notificationElement.style.height = '120px';
+                        helpOpen = true;
+                    };
+
+                    stndz.togglePopupNotificationHelp = function() {
+                        notificationElement.style.height = helpOpen ? '30px' : '120px';
+                        helpOpen = !helpOpen;
+                    };
+
+                    stndz.showPopupNotification();
+                }
+
+                break;
+
+            case 'stndz-popup-action':
+                stndz.stndzPopupAction &amp;&amp; stndz.stndzPopupAction(event.data.option);
+                break;
+
+            case 'stndz-popup-update':
+                if (event.data.shutdown &amp;&amp; event.data.machineId == popupBlockMessage.machineId &amp;&amp; event.data.iframeGuid != popupBlockMessage.iframeGuid) {
+                    stndz.active = false;
+                } else if (event.data.iframeGuid == popupBlockMessage.iframeGuid &amp;&amp; event.data.active != null) {
+                    stndz.active = event.data.active;
+                }
+                break;
+        }
+    }, false);
+
+    function showPopupNotificationWindow(blockType, popupUrl, openPopupFunc) {
+        if (!showNotification)
+            return;
+
+        var popupHost = null;
+        try {
+            if (popupUrl == "about:blank") {
+                popupHost = "about:blank";
+            } else {
+                var urlDetails = new URL(popupUrl);
+                popupHost = urlDetails.host.indexOf('www.') == 0 ? urlDetails.host.substring(4) : urlDetails.host;
+            }
+        } catch(e) { }
+
+        stndz.stndzPopupAction = function(option) {
+            window.postMessage({
+                type: 'popup-user-action',
+                iframeGuid: popupBlockMessage.iframeGuid,
+                popupHost: popupHost,
+                popupUrl: popupUrl,
+                option: option,
+                blockType: blockType
+            }, '*');
+
+            if (option == 'once' || option == 'allow') {
+                stndz.active = false;
+                openPopupFunc &amp;&amp; openPopupFunc();
+            } else {
+                showNotification = false;
+            }
+        };
+
+        window.top.postMessage({
+            type: 'stndz-show-popup-notification',
+            iframeGuid: popupBlockMessage.iframeGuid
+        }, '*');
+
+        window.postMessage({
+            type: 'popup-blocked',
+            iframeGuid: popupBlockMessage.iframeGuid,
+            blockType: blockType,
+            popupHost: popupHost,
+            popupUrl: popupUrl
+        }, '*');
+    }
+
+    function createNotificationOnPage() {
+        var style = document.createElement('style');
+        style.textContent = '.stndz-popup-notification {' +
+        'width: 670px;' +
+        'height: 30px;' +
+        'position: fixed;' +
+        'overflow: hidden;' +
+        'top: -40px;' +
+        'margin: 0 auto;' +
+        'z-index: 2147483647;' +
+        'left: 0px;' +
+        'right: 0px;' +
+        'background: rgb(240, 240, 240);' +
+        'border-radius: 0px 0px 5px 5px;' +
+        'border: solid 1px #999999;' +
+        'box-shadow: 0px 2px 5px #444444;' +
+        'border-top: none; ' +
+        'line-height: 31px;' +
+        'font-size: 12px;' +
+        'font-family: sans-serif;' +
+        'color: #59595c;' +
+        'text-align: center;' +
+        'direction: ltr;' +
+        'transition-duration: 500ms;}' +
+        '.stndz-button {' +
+        'all: unset;' +
+        'padding: 3px 15px !important;' +
+        'border: solid 1px #a4a6aa !important;' +
+        'height: 25px !important;' +
+        'border-radius: 5px !important;' +
+        'background-color: #3058b0 !important;' +
+        'background: linear-gradient(#f5f5f5, #dfdfdf) !important;' +
+        'box-shadow: inset 0px 1px 0px #ffffff, inset 0 -1px 2px #acacac !important;' +
+        'color: #555555 !important;' +
+        'font-size: 12px !important;' +
+        'line-height: 16px !important;' +
+        'font-family: sans-serif !important;' +
+        'text-align: center !important;' +
+        'background-repeat: no-repeat !important;' +
+        'text-decoration: none !important;}' +
+        '.stndz-button:hover{' +
+        'all: unset;' +
+        'background: linear-gradient(#eeeeee, #d1d1d1) !important;' +
+        'text-decoration: none !important;' +
+        'color: #555555 !important;}';
+        document.documentElement.appendChild(style);
+
+        var div = document.createElement('div');
+        div.setAttribute('class', 'stndz-popup-notification');
+        div.innerHTML = '&lt;img src="chrome-extension://' + extensionId + '/views/web_accessible/images/icon.png" style="top: 5px; left: 5px;height: 20px; display: initial;position: absolute;"&gt;' +
+        '&amp;nbsp;&lt;b&gt;Site Popup Blocked:&lt;/b&gt;' +
+        '&amp;nbsp;&amp;nbsp;&lt;a href="javascript:void(0)" id="stndz-popup-allow-once" class="stndz-button"&gt;Allow once&lt;/a&gt;' +
+        '&amp;nbsp;&amp;nbsp;&lt;a href="javascript:void(0)" id="stndz-popup-allow" class="stndz-button"&gt;Allow always&lt;/a&gt;' +
+        '&amp;nbsp;&amp;nbsp;&lt;a href="javascript:void(0)" id="stndz-popup-block" class="stndz-button"&gt;Block always&lt;/a&gt;' +
+        '&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;a href="javascript:void(0)" id="stndz-popup-help"&gt;&lt;img src="chrome-extension://' + extensionId + '/views/web_accessible/images/help.png" style="opacity: 0.3; position: absolute; top: 7px; display: initial;right: 30px;" /&gt;&lt;/a&gt;' +
+        '&amp;nbsp;&lt;a href="javascript:void(0)" id="stndz-popup-close"&gt;&lt;img src="chrome-extension://' + extensionId + '/views/web_accessible/images/close.png" style="opacity: 0.3; position: absolute; top: 7px; display: initial;right: 7px;" /&gt;&lt;/a&gt;' +
+        '&lt;br /&gt;&lt;div style="line-height: 22px; text-align: left; padding: 0px 5px 0px 5px; font-size: 11px;"&gt;The site tried to open a popup and Stands blocked it.' +
+        '&lt;br /&gt;if you don\'t trust this site you should click &lt;b&gt;"Block always"&lt;/b&gt;, if you do click &lt;b&gt;"Allow always"&lt;/b&gt;.' +
+        '&lt;br /&gt;If you\'re not sure click &lt;b&gt;"Allow once"&lt;/b&gt; which will open the popup and pause popup blocking for the current page visit.' +
+        '&lt;br /&gt;You can always change your settings in the application window.&lt;/div&gt;';
+        document.body.appendChild(div);
+
+        document.getElementById("stndz-popup-allow-once").addEventListener("click", function(event) { event.preventDefault(); stndz.stndzPopupClicked("once") }, true);
+        document.getElementById("stndz-popup-allow").addEventListener("click", function(event) { event.preventDefault(); stndz.stndzPopupClicked("allow") }, true);
+        document.getElementById("stndz-popup-block").addEventListener("click", function(event) { event.preventDefault(); stndz.stndzPopupClicked("block") }, true);
+        document.getElementById("stndz-popup-help").addEventListener("click", function(event) { event.preventDefault(); stndz.togglePopupNotificationHelp() }, true);
+        document.getElementById("stndz-popup-close").addEventListener("click", function(event) { event.preventDefault(); stndz.hidePopupNotification(); }, true);
+
+        return div;
+    }
+
+    try {
+        Object.defineProperty(window,"ExoLoader",{configurable:false,get:function(){return null;},set:function(){return null;}});
+        Object.defineProperty(window,"_pao",{configurable:false,get:function(){throw '';},set:function(){throw '';}});
+
+        Object.defineProperty(window,"BetterJsPop",{configurable:false,get:function(){throw '';},set:function(){throw '';}});
+        Object.defineProperty(window,"popnsKiller",{configurable:false,get:function(){throw '';},set:function(){throw '';}});
+        Object.defineProperty(window,"popns",{configurable:false,get:function(){return 'popnsKiller';},set:function(){return 'popnsKiller';}});
+    } catch(e) {}
+})({"type":"popup-user-action","machineId":"S3qTJIZW1nmlzqRc0vHC9MNr3MaSBO6LYz9A","iframeGuid":"dBeZL9VHo3IKQx85T6Kb3mbRNoB6BMcIARMX"},true, 'lgblnfidahcdcjddiepkckcfdhpknnjh', ["directrev\\.com","tradeadexchange\\.com","liveadexchanger\\.com","interyield\\.","ordingly\\.com","peritas247\\.info","goodbookbook\\.com","word-my\\.com","terraclicks\\.com","tracki112\\.com","popped","ahtamsu\\.ru","startnewtab\\.com","onclickads\\.net","europacash\\.com","wordkeyhelper\\.com","d1110e4\\.se","buzzonclick\\.com","adultadworld\\.com","3wr110\\.net","ads\\.xladzop\\.com","mtagmonetizationc\\.com","ad\\.propellerads\\.com","popmyads\\.com","popunderclick\\.com","pipeaota\\.com","expocrack\\.com","trafficforce\\.com","poprockets\\.info","trustedsurf\\.com","smartnewtab\\.com","wonderlandads\\.com","admediatracker\\.com","n\\d{3}adserv\\.com","adland\\.co","adexc\\.net","buzzadexchange\\.com","104\\.197\\.4\\.220","xmediaserve\\.com","popcash\\.net","adpop-\\d\\.com","adk2x\\.com","adplxmd\\.com","exoclick\\.com","bounceads\\.net","whoads\\.net","onclickpredictiv\\.com","installation\\.club","advertiserurl\\.com","pureadexchange\\.com","adsrvmedia\\.net","linkmyc\\.com","popmycash\\.com","clickppcbuzz\\.com","adsxn\\.com","bestadbid\\.com","clickadu\\.com","adxpansion\\.com","med4ad\\.com","appnord\\.xyz","rutorads\\.com","104\\.197\\.140\\.120","buzzadnetwork\\.com","qrlsx\\.com","pipsol\\.net","prosoftwarepc\\.com","performanceadexchange\\.com","buy-targeted-traffic\\.com","104\\.154\\.237\\.93","tabcontent\\.net","popunder\\.[a-z]{2,4}","popads\\.[a-z]{2,4}","wwwpromoter\\.com","([^\\/\\.]*\\.)([^\\/\\.]*\\.)711\\d*\\.com","isanalyze\\.com","adrunnr\\.com","trackpprofile\\.com","adnetworkperformance\\.com","104\\.197\\.199\\.227","traffic-media\\.co","doublepimp\\.com","creatives\\.livejasmin\\.com","electosake\\.com","maxonclick\\.com","onclasrv\\.com","exdynsrv\\.com","ulrtep\\.com","onclkds\\.com","bororango\\.com","ijquery11\\.com","spotscenered\\.info","parserworld\\.info","130\\.211\\.230\\.53"]);;(function(){document.currentScript.parentElement.removeChild(document.currentScript);})();</script><style xmlns="" id="stndz-style"/><style id="xml-viewer-style">/* Copyright 2014 The Chromium Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+div.header {
+    border-bottom: 2px solid black;
+    padding-bottom: 5px;
+    margin: 10px;
+}
+
+div.collapsible &gt; div.hidden {
+    display:none;
+}
+
+.pretty-print {
+    margin-top: 1em;
+    margin-left: 20px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+#webkit-xml-viewer-source-xml {
+    display: none;
+}
+
+.collapsible-content {
+    margin-left: 1em;
+}
+.comment {
+    white-space: pre;
+}
+
+.button {
+    -webkit-user-select: none;
+    cursor: pointer;
+    display: inline-block;
+    margin-left: -10px;
+    width: 10px;
+    background-repeat: no-repeat;
+    background-position: left top;
+    vertical-align: bottom;
+}
+
+.collapse-button {
+    background: url("data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' fill='%23909090' width='10' height='10'&gt;&lt;path d='M0 0 L8 0 L4 7 Z'/&gt;&lt;/svg&gt;");
+    height: 10px;
+}
+
+.expand-button {
+    background: url("data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' fill='%23909090' width='10' height='10'&gt;&lt;path d='M0 0 L0 8 L7 4 Z'/&gt;&lt;/svg&gt;");
+    height: 10px;
+}
+</style></head><body><div id="webkit-xml-viewer-source-xml"><Response xmlns=""><Message><Body>You said :undefined.
+ Configure your WhatsApp Sandbox's Inbound URL to change this message.</Body></Message></Response></div><div class="header"><span>This XML file does not appear to have any style information associated with it. The document tree is shown below.</span><br /></div><div class="pretty-print"><div class="collapsible" id="collapsible0"><div class="expanded"><div class="line"><span class="button collapse-button"></span><span class="html-tag">&lt;Response&gt;</span></div><div class="collapsible-content"><div class="collapsible" id="collapsible1"><div class="expanded"><div class="line"><span class="button collapse-button"></span><span class="html-tag">&lt;Message&gt;</span></div><div class="collapsible-content"><div class="collapsible" id="collapsible2"><div class="expanded"><div class="line"><span class="button collapse-button"></span><span class="html-tag">&lt;Body&gt;</span></div><div class="collapsible-content"><span class="text">You said :undefined.
+ Configure your WhatsApp Sandbox's Inbound URL to change this message.</span></div><div class="line"><span class="html-tag">&lt;/Body&gt;</span></div></div><div class="collapsed hidden"><div class="line"><span class="button expand-button"></span><span class="html-tag">&lt;Body&gt;</span><span class="text">...</span><span class="html-tag">&lt;/Body&gt;</span></div></div></div></div><div class="line"><span class="html-tag">&lt;/Message&gt;</span></div></div><div class="collapsed hidden"><div class="line"><span class="button expand-button"></span><span class="html-tag">&lt;Message&gt;</span><span class="text">...</span><span class="html-tag">&lt;/Message&gt;</span></div></div></div></div><div class="line"><span class="html-tag">&lt;/Response&gt;</span></div></div><div class="collapsed hidden"><div class="line"><span class="button expand-button"></span><span class="html-tag">&lt;Response&gt;</span><span class="text">...</span><span class="html-tag">&lt;/Response&gt;</span></div></div></div></div></body></html>
